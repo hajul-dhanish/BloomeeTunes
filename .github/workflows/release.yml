@@ -34,7 +34,7 @@ jobs:
       - name: Update Build Number in pubspec.yaml
         shell: powershell
         run: |
-          echo "📝 Updating build number in pubspec.yaml..."
+          Write-Host "Updating build number in pubspec.yaml..."
           $content = Get-Content pubspec.yaml -Raw
           $vLine = Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1
           if (-not $vLine) { Write-Error 'version not found in pubspec.yaml'; exit 1 }
@@ -48,7 +48,7 @@ jobs:
           
           echo "VERSION=$ver" >> $env:GITHUB_ENV
           echo "BUILD_NUMBER=${{github.run_number}}" >> $env:GITHUB_ENV
-          echo "✅ Updated version to: $newVersion"
+          Write-Host "Updated version to: $newVersion"
 
       - name: Create Keystore File
         run: |
@@ -56,42 +56,42 @@ jobs:
           $filename = "./android/bloomee.jks"
           $bytes = [Convert]::FromBase64String($b64)
           [IO.File]::WriteAllBytes($filename, $bytes)
-          echo "✅ Keystore file created"
+          Write-Host "Keystore file created"
 
       - name: Create Keystore Properties
         run: |
           echo keyPassword=\${{ secrets.KEY_PASSWORD }} > ./android/key.properties
           echo storePassword=\${{ secrets.STORE_PASSWORD }} >> ./android/key.properties
           echo keyAlias=\${{ secrets.KEY_ALIAS }} >> ./android/key.properties
-          echo "✅ Keystore properties configured"
+          Write-Host "Keystore properties configured"
 
       - name: Build Android Release APK
         run: |
-          echo "🔨 Building Android release APK..."
+          Write-Host "Building Android release APK..."
           flutter build apk --release
-          echo "✅ Android build complete"
+          Write-Host "Android build complete"
 
       - name: Verify APK Signature
         run: |
-          echo "🔍 Verifying APK signature..."
+          Write-Host "Verifying APK signature..."
           $buildToolsDir = Get-ChildItem "$env:ANDROID_HOME\build-tools" | Where-Object { $_.PSIsContainer } | Sort-Object Name -Descending | Select-Object -First 1
-          echo "Using build tools version: $($buildToolsDir.Name)"
+          Write-Host "Using build tools version: $($buildToolsDir.Name)"
           
           & "$($buildToolsDir.FullName)\apksigner.bat" verify build/app/outputs/flutter-apk/app-release.apk
-          echo "✅ APK verified successfully"
+          Write-Host "APK verified successfully"
 
       - name: Rename Android APK
         shell: powershell
         run: |
-          echo "📝 Renaming APK file..."
+          Write-Host "Renaming APK file..."
           Rename-Item -Path "build/app/outputs/flutter-apk/app-release.apk" -NewName "bloomee_tunes_android_v$env:VERSION+$env:BUILD_NUMBER.apk"
-          echo "✅ APK renamed to: bloomee_tunes_android_v$env:VERSION+$env:BUILD_NUMBER.apk"
+          Write-Host "APK renamed to: bloomee_tunes_android_v$env:VERSION+$env:BUILD_NUMBER.apk"
 
       - name: Build Windows App
         run: |
-          echo "🔨 Building Windows release..."
+          Write-Host "Building Windows release..."
           flutter build windows --release
-          echo "✅ Windows build complete"
+          Write-Host "Windows build complete"
 
       - name: Create Build Number File
         run: |
@@ -101,13 +101,13 @@ jobs:
       - name: Rename Windows Executable
         run: |
           Rename-Item -Path "build/windows/x64/runner/Release/bloomee.exe" -NewName "Bloomee.exe"
-          echo "✅ Windows executable renamed"
+          Write-Host "Windows executable renamed"
 
       - name: Package Windows Build
         run: |
-          echo "📦 Creating Windows ZIP archive..."
-          Compress-Archive -Path build/windows/x64/runner/Release/* -Destination build/windows/x64/bloomee_tunes_windows_x64_v${{ env.VERSION }}+${{github.run_number}}.zip
-          echo "✅ Windows package created"
+          Write-Host "Creating Windows ZIP archive..."
+          Compress-Archive -Path build/windows/x64/runner/Release/* -Destination build/windows/x64/bloomee_tunes_windows_x64_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.zip
+          Write-Host "Windows package created"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
