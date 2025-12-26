@@ -1,7 +1,8 @@
 name: "Flutter Release Build"
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches:
       - main
   workflow_dispatch:
@@ -10,142 +11,89 @@ on:
 jobs:
   release:
     name: Build & Release Flutter App
-    runs-on: windows-latest
+    # Only run when PR is merged from develop branch
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v3.12.0
+        uses: actions/setup-java@v3
         with:
-          distribution: 'oracle'
+          distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.4'
+          flutter-version: '3.24.5'
           channel: 'stable'
 
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Update Build Number in pubspec.yaml
-        shell: powershell
+      - name: Extract Version from pubspec.yaml
+        id: version
         run: |
-          Write-Host "Updating build number in pubspec.yaml..."
-          $content = Get-Content pubspec.yaml -Raw
-          $vLine = Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1
-          if (-not $vLine) { Write-Error 'version not found in pubspec.yaml'; exit 1 }
-          
-          $currentVersion = $vLine.Matches[0].Groups[1].Value
-          $ver = $currentVersion.Split('+')[0]
-          $newVersion = "$ver+${{github.run_number}}"
-          
-          $content = $content -replace "version:\s*$currentVersion", "version: $newVersion"
-          Set-Content -Path pubspec.yaml -Value $content
-          
-          echo "VERSION=$ver" >> $env:GITHUB_ENV
-          echo "BUILD_NUMBER=${{github.run_number}}" >> $env:GITHUB_ENV
-          Write-Host "Updated version to: $newVersion"
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          echo "FULL_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_NAME=${VERSION%+*}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${VERSION#*+}" >> $GITHUB_ENV
+          echo "Extracted version: $VERSION"
 
       - name: Create Keystore File
         run: |
-          $b64 = "${{ secrets.KEY_STORE }}"
-          $filename = "./android/bloomee.jks"
-          $bytes = [Convert]::FromBase64String($b64)
-          [IO.File]::WriteAllBytes($filename, $bytes)
-          Write-Host "Keystore file created"
+          echo "${{ secrets.KEY_STORE }}" | base64 -d > ./android/bloomee.jks
+          echo "Keystore file created"
 
       - name: Create Keystore Properties
         run: |
-          echo keyPassword=\${{ secrets.KEY_PASSWORD }} > ./android/key.properties
-          echo storePassword=\${{ secrets.STORE_PASSWORD }} >> ./android/key.properties
-          echo keyAlias=\${{ secrets.KEY_ALIAS }} >> ./android/key.properties
-          Write-Host "Keystore properties configured"
+          cat > ./android/key.properties << EOF
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          EOF
+          echo "Keystore properties configured"
 
       - name: Build Android Release APK
         run: |
-          Write-Host "Building Android release APK..."
+          echo "Building Android release APK..."
           flutter build apk --release
-          Write-Host "Android build complete"
-
-      - name: Verify APK Signature
-        run: |
-          Write-Host "Verifying APK signature..."
-          $buildToolsDir = Get-ChildItem "$env:ANDROID_HOME\build-tools" | Where-Object { $_.PSIsContainer } | Sort-Object Name -Descending | Select-Object -First 1
-          Write-Host "Using build tools version: $($buildToolsDir.Name)"
-          
-          & "$($buildToolsDir.FullName)\apksigner.bat" verify build/app/outputs/flutter-apk/app-release.apk
-          Write-Host "APK verified successfully"
+          echo "Android build complete"
 
       - name: Rename Android APK
-        shell: powershell
         run: |
-          Write-Host "Renaming APK file..."
-          Rename-Item -Path "build/app/outputs/flutter-apk/app-release.apk" -NewName "bloomee_tunes_android_v$env:VERSION+$env:BUILD_NUMBER.apk"
-          Write-Host "APK renamed to: bloomee_tunes_android_v$env:VERSION+$env:BUILD_NUMBER.apk"
-
-      - name: Build Windows App
-        run: |
-          Write-Host "Building Windows release..."
-          flutter build windows --release
-          Write-Host "Windows build complete"
-
-      - name: Create Build Number File
-        run: |
-          echo $env:BUILD_NUMBER > build-number.txt
-          echo "Build number: $env:BUILD_NUMBER"
-
-      - name: Rename Windows Executable
-        run: |
-          Rename-Item -Path "build/windows/x64/runner/Release/bloomee.exe" -NewName "Bloomee.exe"
-          Write-Host "Windows executable renamed"
-
-      - name: Package Windows Build
-        run: |
-          Write-Host "Creating Windows ZIP archive..."
-          Compress-Archive -Path build/windows/x64/runner/Release/* -Destination build/windows/x64/bloomee_tunes_windows_x64_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.zip
-          Write-Host "Windows package created"
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Release-v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}
-          path: |
-            build/app/outputs/flutter-apk/bloomee_tunes_android_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.apk
-            build/windows/x64/bloomee_tunes_windows_x64_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.zip
-            build-number.txt
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/BloomeeTunes-v${{ env.FULL_VERSION }}.apk
+          echo "APK renamed to: BloomeeTunes-v${{ env.FULL_VERSION }}.apk"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: |
-            build/app/outputs/flutter-apk/bloomee_tunes_android_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.apk
-            build/windows/x64/bloomee_tunes_windows_x64_v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}.zip
-            build-number.txt
-          tag: v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}
-          name: Release v${{ env.VERSION }}+${{ env.BUILD_NUMBER }}
+          artifacts: build/app/outputs/flutter-apk/BloomeeTunes-v${{ env.FULL_VERSION }}.apk
+          tag: v${{ env.FULL_VERSION }}
+          name: BloomeeTunes v${{ env.VERSION_NAME }}
           body: |
-            ## 🎉 BloomeeTunes Release v${{ env.VERSION }}
+            ## 🎉 BloomeeTunes Release v${{ env.VERSION_NAME }}
             
-            **Build Number:** ${{ env.BUILD_NUMBER }}
-            **Release Date:** ${{ github.event.head_commit.timestamp }}
+            **Version:** ${{ env.VERSION_NAME }}
+            **Build Number:** ${{ env.VERSION_CODE }}
+            **Release Date:** ${{ github.event.pull_request.merged_at }}
             
-            ### 📦 Downloads
+            ### 📦 Download
             
-            #### Android
-            - **Release APK** - Universal APK that works on all Android devices
-            
-            #### Windows
-            - **Windows x64** - ZIP archive for Windows 10/11
+            **Android APK** - Universal APK compatible with all Android devices (ARM, ARM64, x86, x86_64)
             
             ### 📝 Changes
-            This release was automatically built from the latest merge to main branch.
+            
+            This release was automatically built from PR #${{ github.event.pull_request.number }}: "${{ github.event.pull_request.title }}"
+            
+            Merged from `develop` → `main` by @${{ github.event.pull_request.user.login }}
             
             ---
             *Automated release generated by GitHub Actions*
           token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: true
           draft: false
+          prerelease: false
