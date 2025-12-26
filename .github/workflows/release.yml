@@ -42,35 +42,13 @@ jobs:
           echo "VERSION_CODE=${VERSION#*+}" >> $GITHUB_ENV
           echo "Extracted version: $VERSION"
 
-      - name: Create Keystore File
-        run: |
-          echo "${{ secrets.KEY_STORE }}" | base64 -d > ./android/bloomee.jks
-          echo "Keystore file created"
-
-      - name: Create Keystore Properties
-        run: |
-          cat > ./android/key.properties << EOF
-          storeFile=bloomee.jks
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          EOF
-          echo "Keystore properties configured"
-
       - name: Build Android Release APKs (Split per ABI)
         run: |
-          echo "Building Android release APKs..."
+          echo "Building unsigned Android release APKs..."
           flutter build apk --release --split-per-abi
           echo "Android builds complete"
 
-      - name: Verify APK Signatures
-        run: |
-          BUILD_TOOLS=$(ls -v $ANDROID_HOME/build-tools | tail -n 1)
-          echo "Using build tools version: $BUILD_TOOLS"
-          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-x86_64-release.apk
-          echo "All APKs verified successfully"
+
 
       - name: Rename Android APKs
         run: |
