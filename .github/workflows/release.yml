@@ -66,17 +66,17 @@ jobs:
       - name: Rename Android APK
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/BloomeeTunes-v${{ env.FULL_VERSION }}.apk
-          echo "APK renamed to: BloomeeTunes-v${{ env.FULL_VERSION }}.apk"
+             build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}.apk
+          echo "APK renamed to: Earphoria-v${{ env.FULL_VERSION }}.apk"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: build/app/outputs/flutter-apk/BloomeeTunes-v${{ env.FULL_VERSION }}.apk
+          artifacts: build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}.apk
           tag: v${{ env.FULL_VERSION }}
-          name: BloomeeTunes v${{ env.VERSION_NAME }}
+          name: Earphoria v${{ env.VERSION_NAME }}
           body: |
-            ## 🎉 BloomeeTunes Release v${{ env.VERSION_NAME }}
+            ## 🎉 Earphoria Release v${{ env.VERSION_NAME }}
             
             **Version:** ${{ env.VERSION_NAME }}
             **Build Number:** ${{ env.VERSION_CODE }}
