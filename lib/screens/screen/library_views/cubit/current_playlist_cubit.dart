@@ -3,7 +3,7 @@ import 'package:Bloomee/services/db/bloomee_db_service.dart';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
-import 'package:palette_generator/palette_generator.dart';
+import 'package:flutter/material.dart';
 import 'package:Bloomee/model/MediaPlaylistModel.dart';
 import 'package:Bloomee/model/songModel.dart';
 import 'package:Bloomee/services/db/GlobalDB.dart';
@@ -13,7 +13,7 @@ part 'current_playlist_state.dart';
 
 class CurrentPlaylistCubit extends Cubit<CurrentPlaylistState> {
   MediaPlaylist? mediaPlaylist;
-  PaletteGenerator? paletteGenerator;
+  ColorScheme? colorScheme;
   late BloomeeDBCubit bloomeeDBCubit;
   CurrentPlaylistCubit({
     this.mediaPlaylist,
@@ -26,7 +26,7 @@ class CurrentPlaylistCubit extends Cubit<CurrentPlaylistState> {
         .getPlaylistItems(MediaPlaylistDB(playlistName: playlistName));
 
     if (mediaPlaylist?.mediaItems.isNotEmpty ?? false) {
-      paletteGenerator = await getPalleteFromImage(
+      colorScheme = await getPalleteFromImage(
           mediaPlaylist!.mediaItems[0].artUri.toString());
     }
     // log(paletteGenerator.toString());
@@ -75,7 +75,7 @@ class CurrentPlaylistCubit extends Cubit<CurrentPlaylistState> {
     }
   }
 
-  PaletteGenerator? getCurrentPlaylistPallete() {
-    return paletteGenerator;
+  ColorScheme? getCurrentPlaylistColorScheme() {
+    return colorScheme;
   }
 }

@@ -862,8 +862,7 @@ class _AmbientImgShadowWidgetState extends State<AmbientImgShadowWidget> {
       final palette = await getPalleteFromImage(artUri);
       if (mounted) {
         setState(() {
-          cachedColor = palette.dominantColor?.color ??
-              const Color.fromARGB(255, 68, 252, 255);
+          cachedColor = palette.primary;
         });
       }
     } catch (e) {
