@@ -46,14 +46,12 @@ class PlaylistView extends StatelessWidget {
     // get foreground and background color from current playlist pallete
     Color? color = context
         .read<CurrentPlaylistCubit>()
-        .getCurrentPlaylistPallete()
-        ?.lightVibrantColor
-        ?.color;
+        .getCurrentPlaylistColorScheme()
+        ?.primaryContainer;
     Color? bgColor = context
         .read<CurrentPlaylistCubit>()
-        .getCurrentPlaylistPallete()
-        ?.darkMutedColor
-        ?.color;
+        .getCurrentPlaylistColorScheme()
+        ?.onPrimaryContainer;
     if (bgColor != null && color != null) {
       //calculate contrast between two color and bgcolor
       final double contrast =
