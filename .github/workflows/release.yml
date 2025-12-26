@@ -1,16 +1,15 @@
-name: "Flutter Release Build"
+name: "Build & Release"
 
 on:
   pull_request:
     types: [closed]
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
     # Allow manual trigger for emergency releases
 
 jobs:
   release:
-    name: Build & Release Flutter App
+    name: Build & Release All Platforms
     # Only run when PR is merged from develop branch
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     runs-on: ubuntu-latest
@@ -57,22 +56,38 @@ jobs:
           EOF
           echo "Keystore properties configured"
 
-      - name: Build Android Release APK
+      - name: Build Android Release APKs (Split per ABI)
         run: |
-          echo "Building Android release APK..."
-          flutter build apk --release
-          echo "Android build complete"
+          echo "Building Android release APKs..."
+          flutter build apk --release --split-per-abi
+          echo "Android builds complete"
 
-      - name: Rename Android APK
+      - name: Verify APK Signatures
         run: |
-          mv build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}.apk
-          echo "APK renamed to: Earphoria-v${{ env.FULL_VERSION }}.apk"
+          BUILD_TOOLS=$(ls -v $ANDROID_HOME/build-tools | tail -n 1)
+          echo "Using build tools version: $BUILD_TOOLS"
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify build/app/outputs/flutter-apk/app-x86_64-release.apk
+          echo "All APKs verified successfully"
+
+      - name: Rename Android APKs
+        run: |
+          mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+             build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-armeabi-v7a.apk
+          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-arm64-v8a.apk
+          mv build/app/outputs/flutter-apk/app-x86_64-release.apk \
+             build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-x86_64.apk
+          echo "APKs renamed successfully"
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}.apk
+          artifacts: |
+            build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-armeabi-v7a.apk
+            build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-arm64-v8a.apk
+            build/app/outputs/flutter-apk/Earphoria-v${{ env.FULL_VERSION }}-x86_64.apk
           tag: v${{ env.FULL_VERSION }}
           name: Earphoria v${{ env.VERSION_NAME }}
           body: |
@@ -82,9 +97,12 @@ jobs:
             **Build Number:** ${{ env.VERSION_CODE }}
             **Release Date:** ${{ github.event.pull_request.merged_at }}
             
-            ### 📦 Download
+            ### 📦 Downloads
             
-            **Android APK** - Universal APK compatible with all Android devices (ARM, ARM64, x86, x86_64)
+            **Android APKs** (Choose the right one for your device):
+            - `armeabi-v7a` - 32-bit ARM devices (older phones)
+            - `arm64-v8a` - 64-bit ARM devices (most modern phones) **← Recommended for most users**
+            - `x86_64` - Intel/AMD 64-bit devices (rare)
             
             ### 📝 Changes
             
